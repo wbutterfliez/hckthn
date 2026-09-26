@@ -99,3 +99,25 @@ exports.getChats = async (req, res) => {
     res.status(500).json({ msg: "Server error" });
   }
 };
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const { bio, skillsOffered, skillsWanted, avatar } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      req.user,
+      {
+        bio,
+        skillsOffered,
+        skillsWanted,
+        avatar,
+        isProfileComplete: true,
+      },
+      { new: true }
+    );
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ msg: "Server error" });
+  }
+};

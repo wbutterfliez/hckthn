@@ -1,27 +1,43 @@
 const express = require("express");
-const http = require("http");
 const cors = require("cors");
-const dotenv = require("dotenv");
-const connectDB = require("./config/db");
+const mongoose = require("mongoose");
+const http = require("http");
+require("dotenv").config();
+
+// 🔥 IMPORT SOCKET
 const { initSocket } = require("./sockets/socket");
 
-dotenv.config();
-connectDB();
-
 const app = express();
+
+// ✅ CREATE SERVER (IMPORTANT)
 const server = http.createServer(app);
 
-// middleware
+// ✅ MIDDLEWARE
 app.use(cors());
 app.use(express.json());
 
-// routes
-app.use("/api/auth", require("./routes/authRoutes"));
-app.use("/api/users", require("./routes/userRoutes"));
-app.use("/api/match", require("./routes/matchRoutes"));
+// ✅ ROUTES
+app.use("/auth", require("./routes/authRoutes"));
+app.use("/users", require("./routes/userRoutes"));
+app.use("/match", require("./routes/matchRoutes"));
 
-// socket
+// ✅ TEST ROUTE
+app.get("/", (req, res) => {
+  res.send("API running...");
+});
+
+// ✅ INIT SOCKET
 initSocket(server);
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on ${PORT}`));
+// ✅ DB CONNECT
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("MongoDB connected");
+
+    // 🔥 USE SERVER NOT APP
+    server.listen(5000, () => {
+      console.log("Server running on port 5000");
+    });
+  })
+  .catch((err) => console.log(err));

@@ -14,7 +14,9 @@ export default function MatchCard({ user, index = 0 }: any) {
 
   const sendRequest = async () => {
     if (!msg.trim()) return;
+
     setLoading(true);
+
     try {
       const res = await api(
         "/match/request",
@@ -25,10 +27,22 @@ export default function MatchCard({ user, index = 0 }: any) {
         },
         token!
       );
-      const matchId = res.match._id;
+
+      if (res.error === "ALREADY_SENT") {
+        alert("Request already sent.");
+      }
+      // 🔥 SAFE MATCH ID EXTRACTION (NO MORE CRASHES)
+      const matchId = res.match?._id || res._id || res.matchId;
+
+      if (!matchId) {
+        console.error("Invalid response from server:", res);
+        alert("Something went wrong. Check console.");
+        return;
+      }
       router.push(`/chat/${matchId}`);
-    } catch (error) {
-      console.error("Failed to send request:", error);
+
+    } catch (err) {
+      console.error("Failed to send request:", err);
     } finally {
       setLoading(false);
     }

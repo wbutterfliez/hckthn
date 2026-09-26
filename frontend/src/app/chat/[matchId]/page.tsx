@@ -19,61 +19,65 @@ export default function Chat() {
   const [messages, setMessages] = useState<any[]>([]);
   const [connected, setConnected] = useState(false);
   const [matchName, setMatchName] = useState("");
+  const [status, setStatus] = useState<"pending" | "accepted" | "rejected">("pending");
+  const [isReceiver, setIsReceiver] = useState(false);
 
-  // Load match name
+  // ✅ LOAD MATCH INFO
   useEffect(() => {
     const loadMatchInfo = async () => {
       if (!token || !matchId) return;
+
       try {
         const data = await api(`/match/${matchId}`, "GET", null, token);
+
         setMatchName(data.matchName || "Chat");
+        setStatus(data.status || "pending");
+
+        setIsReceiver(data.isReceiver);
       } catch (error) {
-        console.error("Failed to load match info:", error);
+        console.error(error);
       }
     };
-    loadMatchInfo();
-  }, [matchId, token]);
 
-  // Load old messages
+    loadMatchInfo();
+  }, [matchId, token, user?._id]);
+
+  // ✅ LOAD OLD MESSAGES
   useEffect(() => {
     const loadMessages = async () => {
       if (!token || !matchId) return;
+
       try {
         const data = await api(`/match/messages/${matchId}`, "GET", null, token);
-        if (Array.isArray(data)) {
-          setMessages(data);
-        }
+        if (Array.isArray(data)) setMessages(data);
       } catch (error) {
-        console.error("Failed to load messages:", error);
+        console.error(error);
       }
     };
+
     loadMessages();
   }, [matchId, token]);
 
-  // Connect + Join
+  // ✅ SOCKET CONNECT
   useEffect(() => {
     if (!matchId) return;
 
-    if (!socket.connected) {
-      socket.connect();
-    }
+    if (!socket.connected) socket.connect();
 
-    const onConnect = () => {
+    socket.on("connect", () => {
       setConnected(true);
       socket.emit("join_room", matchId);
-    };
-
-    socket.on("connect", onConnect);
+    });
 
     return () => {
       socket.emit("leave_room", matchId);
-      socket.off("connect", onConnect);
+      socket.off("connect");
     };
   }, [matchId]);
 
-  // Receive messages
+  // ✅ RECEIVE MESSAGE
   useEffect(() => {
-    const handleMessage = (data: any) => {
+    socket.on("receive_message", (data: any) => {
       if (data.matchId === matchId) {
         setMessages((prev) => {
           const exists = prev.find((m) => m._id === data._id);
@@ -81,23 +85,36 @@ export default function Chat() {
           return [...prev, data];
         });
       }
-    };
-
-    socket.on("receive_message", handleMessage);
+    });
 
     return () => {
-      socket.off("receive_message", handleMessage);
+      socket.off("receive_message");
     };
   }, [matchId]);
 
-  // Auto-scroll to bottom
+  // RECEIVE MATCH STATUS UPDATE
+  useEffect(() => {
+    const handleMatchStatusUpdate = (data: any) => {
+      if (data.matchId !== matchId) return;
+
+      setStatus(data.status);
+    };
+
+    socket.on("match_status_updated", handleMatchStatusUpdate);
+
+    return () => {
+      socket.off("match_status_updated", handleMatchStatusUpdate);
+    };
+  }, [matchId]);
+
+  // ✅ AUTO SCROLL
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Send message
+  // ✅ SEND MESSAGE
   const send = () => {
-    if (!msg.trim() || !connected) return;
+    if (!msg.trim() || !connected || status !== "accepted") return;
 
     socket.emit("send_message", {
       matchId,
@@ -108,7 +125,6 @@ export default function Chat() {
     setMsg("");
   };
 
-  // Handle Enter key
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -116,16 +132,63 @@ export default function Chat() {
     }
   };
 
+  // ACCEPT
+  const accept = async () => {
+    try {
+      const data = await api(
+        `/match/accept/${matchId}`,
+        "POST",
+        null,
+        token!
+      );
+
+      if (data?.success) {
+        setStatus("accepted");
+
+        socket.emit("match_status_updated", {
+          matchId,
+          status: "accepted",
+        });
+      }
+    } catch (err) {
+      console.error("ACCEPT ERROR:", err);
+    }
+  };
+
+  // REJECT
+  const reject = async () => {
+    try {
+      const data = await api(
+        `/match/reject/${matchId}`,
+        "POST",
+        null,
+        token!
+      );
+
+      if (data?.success) {
+        setStatus("rejected");
+
+        socket.emit("match_status_updated", {
+          matchId,
+          status: "rejected",
+        });
+      }
+    } catch (err) {
+      console.error("REJECT ERROR:", err);
+    }
+  };
+
   return (
     <div className="h-screen bg-[#221512] flex flex-col">
-      {/* Header */}
-      <div className="bg-[#72463B] border-b border-[#B49E94]/20 px-4 py-3">
+
+      {/* HEADER */}
+      <div className="bg-[#72463B] px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center gap-4">
-          <Link href="/chats" className="text-[#D9C4B9] hover:text-[#B49E94] transition">
+          <Link href="/chats" className="text-[#D9C4B9]">
             ← Back
           </Link>
           <div>
-            <h2 className="font-semibold text-[#D9C4B9]">{matchName || "Loading..."}</h2>
+            <h2 className="text-[#D9C4B9]">{matchName}</h2>
             <p className="text-xs text-[#B49E94]">
               {connected ? "● Online" : "○ Connecting..."}
             </p>
@@ -133,30 +196,43 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Messages */}
+      {/* STATUS */}
+      {status === "pending" && isReceiver && (
+        <div className="bg-yellow-900 text-white p-3 flex justify-center gap-4">
+          <button onClick={accept} className="bg-green-500 px-4 py-1 rounded">
+            Accept
+          </button>
+          <button onClick={reject} className="bg-red-500 px-4 py-1 rounded">
+            Reject
+          </button>
+        </div>
+      )}
+
+      {status === "pending" && !isReceiver && (
+        <div className="bg-yellow-900 text-yellow-200 text-center p-2">
+          Waiting for user to accept your request...
+        </div>
+      )}
+
+      {status === "rejected" && (
+        <div className="bg-red-900 text-red-200 text-center p-2">
+          Request rejected. Chat locked.
+        </div>
+      )}
+
+      {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-4xl mx-auto space-y-3">
           {messages.map((m, idx) => {
-            const isOwn = m.sender === user?._id;
+            const senderId =
+              typeof m.sender === "object" ? m.sender._id : m.sender;
+
+            const isOwn = senderId === user?._id;
+
             return (
-              <div
-                key={m._id || idx}
-                className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[70%] px-4 py-2 rounded-2xl ${
-                    isOwn
-                      ? "bg-[#72463B] text-[#D9C4B9]"
-                      : "bg-[#3A2A25] text-[#D9C4B9]"
-                  }`}
-                >
-                  <p className="text-sm break-words">{m.content}</p>
-                  <p className="text-xs text-[#B49E94] mt-1">
-                    {new Date(m.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
+              <div key={m._id || idx} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[70%] px-4 py-2 rounded-2xl ${isOwn ? "bg-[#72463B]" : "bg-[#3A2A25]"} text-[#D9C4B9]`}>
+                  <p>{m.content}</p>
                 </div>
               </div>
             );
@@ -165,25 +241,27 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Input */}
-      <div className="bg-[#72463B] border-t border-[#B49E94]/20 px-4 py-3">
+      {/* INPUT */}
+      <div className="bg-[#72463B] px-4 py-3">
         <div className="max-w-4xl mx-auto flex gap-3">
           <input
             value={msg}
             onChange={(e) => setMsg(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
-            className="flex-1 px-4 py-2 bg-[#221512] text-[#D9C4B9] rounded-lg border border-[#B49E94]/30 focus:border-[#D9C4B9] focus:outline-none transition-colors placeholder-[#B49E94]/50"
+            onKeyDown={handleKeyPress}
+            disabled={status !== "accepted"}
+            placeholder={status === "accepted" ? "Type..." : "Chat locked..."}
+            className="flex-1 px-4 py-2 bg-[#221512] text-[#D9C4B9] rounded"
           />
           <button
             onClick={send}
-            disabled={!connected || !msg.trim()}
-            className="px-6 py-2 bg-[#D9C4B9] text-[#221512] rounded-lg font-medium hover:bg-[#B49E94] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!connected || !msg.trim() || status !== "accepted"}
+            className="px-6 py-2 bg-[#D9C4B9] text-black rounded"
           >
             Send
           </button>
         </div>
       </div>
+
     </div>
   );
 }

@@ -57,11 +57,18 @@ export default function Navbar() {
               >
                 Logout
               </button>
-              <div className="w-8 h-8 rounded-full bg-[#D9C4B9] flex items-center justify-center">
+              {/* <div className="w-8 h-8 rounded-full bg-[#D9C4B9] flex items-center justify-center">
                 <span className="text-[#221512] font-medium text-sm">
                   {user.name?.charAt(0).toUpperCase()}
                 </span>
-              </div>
+              </div> */}
+              <Link href="/profile">
+                <div className="w-8 h-8 rounded-full bg-[#D9C4B9] flex items-center justify-center cursor-pointer">
+                  <span className="text-[#221512] font-medium text-sm">
+                    {user.name?.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              </Link>
             </div>
           ) : (
             <div className="flex gap-4">

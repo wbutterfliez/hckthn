@@ -1,26 +1,38 @@
-//const BASE_URL = "http://localhost:5000/api";
-const BASE_URL = "http://127.0.0.1:5000/api";
-export const api = async (
+const BASE_URL = "http://localhost:5000";
+
+export const api = async <T = any>(
   endpoint: string,
-  method = "GET",
+  method: string = "GET",
   body?: any,
   token?: string
-) => {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const text = await res.text();
-
+): Promise<T> => {
   try {
-    return JSON.parse(text);
-  } catch {
-    console.error("Non-JSON response:", text);
-    throw new Error("API did not return JSON");
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      ...(body && { body: JSON.stringify(body) }),
+    });
+
+    const text = await res.text();
+    
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("NON-JSON RESPONSE:", text);
+      throw new Error("Server returned invalid response");
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Request failed");
+    }
+
+    return data as T;
+  } catch (err) {
+    console.error("API Error:", err);
+    throw err;
   }
 };

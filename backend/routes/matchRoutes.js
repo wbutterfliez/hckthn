@@ -3,14 +3,19 @@ const auth = require("../middleware/authMiddleware");
 
 const {
   sendRequest,
-  respondRequest,
+  acceptRequest,
+  rejectRequest,
   getMessages,
+  getMatchById,
+  getUserMatches  // Import the new function
 } = require("../controllers/matchController");
-const { getMatchById } = require("../controllers/matchController");
 
-router.get("/:matchId", auth, getMatchById);
+// IMPORTANT: Order matters - put specific routes before parameterized routes
+router.get("/user/matches", auth, getUserMatches);  // This must come BEFORE /:matchId
 router.post("/request", auth, sendRequest);
-router.post("/respond", auth, respondRequest);
+router.post("/accept/:matchId", auth, acceptRequest);
+router.post("/reject/:matchId", auth, rejectRequest);
 router.get("/messages/:matchId", auth, getMessages);
+router.get("/:matchId", auth, getMatchById);  // This catches all, so put it last
 
 module.exports = router;

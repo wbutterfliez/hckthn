@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 const Message = require("../models/Message");
+const Match = require("../models/Match");
 
 let io;
 
@@ -15,26 +16,41 @@ exports.initSocket = (server) => {
 
     socket.on("join_room", (matchId) => {
       socket.join(matchId);
-      console.log("JOINED ROOM:", matchId, socket.id);
     });
 
     socket.on("leave_room", (matchId) => {
       socket.leave(matchId);
-      console.log("LEFT ROOM:", matchId);
     });
 
     socket.on("send_message", async (data) => {
       try {
+        const { senderId, matchId, content } = data;
+
+        // 🔥 FIND MATCH TO GET RECEIVER
+        const match = await Match.findById(matchId);
+
+        if (!match) return;
+
+        const receiverId = match.users.find(
+          (id) => id.toString() !== senderId
+        );
+
+        // 🔥 SAVE MESSAGE (WITH RECEIVER)
         const savedMessage = await Message.create({
-          sender: data.senderId,
-          content: data.content,
-          matchId: data.matchId,
+          sender: senderId,
+          receiver: receiverId,
+          content,
+          matchId,
         });
 
-        io.to(data.matchId).emit("receive_message", savedMessage);
+        io.to(matchId).emit("receive_message", savedMessage);
       } catch (err) {
-        console.error(err);
+        console.error("SOCKET ERROR:", err);
       }
+    });
+
+    socket.on("match_status_updated", (data) => {
+      io.to(data.matchId).emit("match_status_updated", data);
     });
 
     socket.on("disconnect", () => {
