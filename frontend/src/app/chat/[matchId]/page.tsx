@@ -19,7 +19,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<any[]>([]);
   const [connected, setConnected] = useState(false);
   const [matchName, setMatchName] = useState("");
-  const [status, setStatus] = useState<"pending" | "accepted" | "rejected">("pending");
+  const [status, setStatus] = useState<"pending" | "accepted" | "rejected" | "completed">("pending");
   const [isReceiver, setIsReceiver] = useState(false);
 
   // ✅ LOAD MATCH INFO
@@ -178,6 +178,43 @@ export default function Chat() {
     }
   };
 
+  // COMPLETE EXCHANGE
+  const completeExchange = async () => {
+    if (!token || !matchId) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to complete this exchange?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const data = await api(
+        `/match/complete/${matchId}`,
+        "POST",
+        null,
+        token
+      );
+
+      if (data?.success) {
+        setStatus("completed");
+
+        // Tell anyone currently in the room
+        socket.emit("match_status_updated", {
+          matchId,
+          status: "completed",
+        });
+      }
+    } catch (error) {
+      console.error(
+        "COMPLETE EXCHANGE ERROR:",
+        error
+      );
+
+      alert("Failed to complete exchange.");
+    }
+  };
+
   return (
     <div className="h-screen bg-[#221512] flex flex-col">
 
@@ -220,6 +257,12 @@ export default function Chat() {
         </div>
       )}
 
+      {status === "completed" && (
+        <div className="bg-green-900/40 text-green-200 text-center p-3">
+          ✓ This exchange has been completed.
+        </div>
+      )}
+
       {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-4xl mx-auto space-y-3">
@@ -241,24 +284,61 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* INPUT */}
+      {/* INPUT / EXCHANGE CONTROLS */}
       <div className="bg-[#72463B] px-4 py-3">
-        <div className="max-w-4xl mx-auto flex gap-3">
-          <input
-            value={msg}
-            onChange={(e) => setMsg(e.target.value)}
-            onKeyDown={handleKeyPress}
-            disabled={status !== "accepted"}
-            placeholder={status === "accepted" ? "Type..." : "Chat locked..."}
-            className="flex-1 px-4 py-2 bg-[#221512] text-[#D9C4B9] rounded"
-          />
-          <button
-            onClick={send}
-            disabled={!connected || !msg.trim() || status !== "accepted"}
-            className="px-6 py-2 bg-[#D9C4B9] text-black rounded"
-          >
-            Send
-          </button>
+        <div className="max-w-4xl mx-auto">
+
+          {/* COMPLETE BUTTON */}
+          {status === "accepted" && (
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={completeExchange}
+                className="px-4 py-2 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm"
+              >
+                ✓ Complete Exchange
+              </button>
+            </div>
+          )}
+
+          {/* COMPLETED MESSAGE */}
+          {status === "completed" ? (
+            <div className="text-center text-green-200 text-sm py-2">
+              This exchange is completed.
+            </div>
+          ) : (
+            /* MESSAGE INPUT */
+            <div className="flex gap-3">
+              <input
+                value={msg}
+                onChange={(e) =>
+                  setMsg(e.target.value)
+                }
+                onKeyDown={handleKeyPress}
+                disabled={
+                  status !== "accepted"
+                }
+                placeholder={
+                  status === "accepted"
+                    ? "Type..."
+                    : "Chat locked..."
+                }
+                className="flex-1 px-4 py-2 bg-[#221512] text-[#D9C4B9] rounded"
+              />
+
+              <button
+                onClick={send}
+                disabled={
+                  !connected ||
+                  !msg.trim() ||
+                  status !== "accepted"
+                }
+                className="px-6 py-2 bg-[#D9C4B9] text-black rounded disabled:opacity-40"
+              >
+                Send
+              </button>
+            </div>
+          )}
+
         </div>
       </div>
 

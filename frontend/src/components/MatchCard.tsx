@@ -13,7 +13,7 @@ export default function MatchCard({ user, index = 0 }: any) {
   const router = useRouter();
 
   const sendRequest = async () => {
-    if (!msg.trim()) return;
+    if (!msg.trim() || !token) return;
 
     setLoading(true);
 
@@ -23,26 +23,46 @@ export default function MatchCard({ user, index = 0 }: any) {
         "POST",
         {
           receiverId: user._id,
-          content: msg,
+          content: msg.trim(),
         },
-        token!
+        token
       );
 
+      // Existing request
       if (res.error === "ALREADY_SENT") {
         alert("Request already sent.");
+        return;
       }
-      // 🔥 SAFE MATCH ID EXTRACTION (NO MORE CRASHES)
-      const matchId = res.match?._id || res._id || res.matchId;
+
+      // Backend response:
+      // {
+      //   match: {...},
+      //   message: {...}
+      // }
+
+      const matchId =
+        res?.match?._id ||
+        res?._id ||
+        res?.matchId;
 
       if (!matchId) {
-        console.error("Invalid response from server:", res);
+        console.error(
+          "Invalid response from server:",
+          res
+        );
+
         alert("Something went wrong. Check console.");
         return;
       }
-      router.push(`/chat/${matchId}`);
 
+      router.push(`/chat/${matchId}`);
     } catch (err) {
-      console.error("Failed to send request:", err);
+      console.error(
+        "Failed to send request:",
+        err
+      );
+
+      alert("Failed to send request.");
     } finally {
       setLoading(false);
     }

@@ -5,17 +5,68 @@ const {
   sendRequest,
   acceptRequest,
   rejectRequest,
+  cancelRequest,
+  completeExchange,
+  getIncomingRequests,
+  getOutgoingRequests,
+  getActiveExchanges,
+  getCompletedExchanges,
   getMessages,
   getMatchById,
-  getUserMatches  // Import the new function
+  getUserMatches,
 } = require("../controllers/matchController");
 
-// IMPORTANT: Order matters - put specific routes before parameterized routes
-router.get("/user/matches", auth, getUserMatches);  // This must come BEFORE /:matchId
+// Requests
 router.post("/request", auth, sendRequest);
 router.post("/accept/:matchId", auth, acceptRequest);
 router.post("/reject/:matchId", auth, rejectRequest);
-router.get("/messages/:matchId", auth, getMessages);
-router.get("/:matchId", auth, getMatchById);  // This catches all, so put it last
+router.delete("/cancel/:matchId", auth, cancelRequest);
+
+// Exchange management
+router.post("/complete/:matchId", auth, completeExchange);
+
+router.get(
+  "/requests/incoming",
+  auth,
+  getIncomingRequests
+);
+
+router.get(
+  "/requests/outgoing",
+  auth,
+  getOutgoingRequests
+);
+
+router.get(
+  "/exchanges/active",
+  auth,
+  getActiveExchanges
+);
+
+router.get(
+  "/exchanges/completed",
+  auth,
+  getCompletedExchanges
+);
+
+// Existing chat routes
+router.get(
+  "/user/matches",
+  auth,
+  getUserMatches
+);
+
+router.get(
+  "/messages/:matchId",
+  auth,
+  getMessages
+);
+
+// MUST BE LAST
+router.get(
+  "/:matchId",
+  auth,
+  getMatchById
+);
 
 module.exports = router;

@@ -11,6 +11,7 @@ interface ChatPreview {
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
+  status: "pending" | "accepted" | "rejected" | "completed";
 }
 
 export default function ChatsPage() {
@@ -76,6 +77,16 @@ export default function ChatsPage() {
                     </h3>
                     <p className="text-sm text-[#B49E94] truncate">
                       {chat.lastMessage}
+                    </p>
+
+                    <p className="text-xs text-[#B49E94] mt-1">
+                      {chat.status === "accepted"
+                        ? "Active exchange"
+                        : chat.status === "completed"
+                        ? "Completed"
+                        : chat.status === "pending"
+                        ? "Pending request"
+                        : "Rejected"}
                     </p>
                   </div>
 
